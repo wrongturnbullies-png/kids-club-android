@@ -1,0 +1,51 @@
+name: Build Kids Club Android APKs
+on:
+  workflow_dispatch:
+  push:
+    paths:
+      - 'Kids_Club_Android_Starter.zip'
+      - '.github/workflows/build-kids-club.yml'
+permissions:
+  contents: read
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [child, parent]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      - name: Extract starter bundle
+        run: |
+          mkdir -p starter
+          unzip -o Kids_Club_Android_Starter.zip -d starter
+          test -f "starter/apps/${{ matrix.app }}/www/index.html"
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Install dependencies
+        working-directory: starter/apps/${{ matrix.app }}
+        run: npm install
+      - name: Generate Android project
+        working-directory: starter/apps/${{ matrix.app }}
+        run: npx cap add android
+      - name: Sync web assets
+        working-directory: starter/apps/${{ matrix.app }}
+        run: npx cap sync android
+      - name: Build debug APK
+        working-directory: starter/apps/${{ matrix.app }}/android
+        run: chmod +x gradlew && ./gradlew assembleDebug
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kids-club-${{ matrix.app }}-debug-apk
+          path: starter/apps/${{ matrix.app }}/android/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
